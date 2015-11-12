@@ -27,6 +27,7 @@ function restrict_admin_login_by_ip ($user, $password) {
 			$allowed_ips = array(
 				'127.0.0.1',
 				'192.168.1.7',
+				'192.168.1.58',
 				'173.48.255.21', // pool-173-48-255-21.bstnma.fios.verizon.net
 			);
 			if ( in_array( $ip, $allowed_ips ) ) {
