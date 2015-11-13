@@ -42,6 +42,7 @@ function restrict_admin_login_by_ip( $user, $password  ) {
 				'127.0.0.1',
 				'192.168.1.7',
 				'192.168.1.5',
+				'192.168.1.58',
 				'173.48.255.21', // pool-173-48-255-21.bstnma.fios.verizon.net
 				'173.76.20.67',
 				'70.192.17.93',
