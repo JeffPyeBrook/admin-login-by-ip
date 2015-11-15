@@ -275,5 +275,5 @@ function pbci_log_security_message( $message, $danger = false ) {
 
 	error_log( $message );
 
-	file_put_contents( $security_log, $message . "\n", FILE_APPEND );
+	file_put_contents( $security_log, current_time( 'mysql' ) . $message . "\n", FILE_APPEND );
 }
