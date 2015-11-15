@@ -68,11 +68,13 @@ add_filter( 'init', 'pbci_early_check_for_access', 1 );
 
 function pbci_early_check_for_access() {
 	if ( is_current_script_restricted() ) {
-		error_log( __FUNCTION__ );
-		if ( ! is_current_ip_allowed() ) {
-			header( 'HTTP/1.0 403 Forbidden' );
-			echo 'HTTP/1.0 403 Forbidden';
-			exit( 0 );
+		if ( pbci_security_force_ssl() ) {
+			error_log( __FUNCTION__ );
+			if ( ! is_current_ip_allowed() ) {
+				header( 'HTTP/1.0 403 Forbidden' );
+				echo 'HTTP/1.0 403 Forbidden';
+				exit( 0 );
+			}
 		}
 	}
 }
@@ -277,3 +279,17 @@ function pbci_log_security_message( $message, $danger = false ) {
 
 	file_put_contents( $security_log, current_time( 'mysql' ) . $message . "\n", FILE_APPEND );
 }
+
+
+function pbci_security_force_ssl() {
+	if ( ! is_ssl () ) {
+		header('HTTP/1.1 301 Moved Permanently');
+		header("Location: https://" . $_SERVER["SERVER_NAME"] . $_SERVER["REQUEST_URI"]);
+		exit();
+		return false;
+	}
+
+	return true;
+}
+
+add_action('template_redirect', 'force_ssl');
