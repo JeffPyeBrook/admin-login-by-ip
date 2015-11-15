@@ -71,9 +71,33 @@ function pbci_early_check_for_access() {
 		if ( pbci_security_force_ssl() ) {
 			error_log( __FUNCTION__ );
 			if ( ! is_current_ip_allowed() ) {
-				header( 'HTTP/1.0 403 Forbidden' );
-				echo 'HTTP/1.0 403 Forbidden';
-				exit( 0 );
+				$current_ip = $_SERVER['REMOTE_ADDR'];
+				$transient_key = 'forbidden-ip-' . trim( $current_ip );
+				$failed_access_ettempts = get_transient( $transient_key );
+				if ( false === $failed_access_ettempts ) {
+					$failed_access_ettempts = 0;
+				}
+
+				$failed_access_ettempts = intval( $failed_access_ettempts );
+				$failed_access_ettempts++;
+				set_transient( $transient_key, $failed_access_ettempts, DAY_IN_SECONDS );
+
+				error_log( 'WARNING: ' . $current_ip . ' has ' . $failed_access_ettempts . ' disallowed access attempts within the last day ' . __FUNCTION__ );
+
+				if ( $failed_access_ettempts == 1 ) {
+					status_header( 403 );
+//					header( 'HTTP/1.0 403 Forbidden' );
+//					echo 'HTTP/1.0 403 Forbidden';
+					exit( 0 );
+				} else {
+					// die as solently as possible
+					if ( ob_get_level() ) {
+						ob_clean();
+					}
+
+					status_header( 404 );
+					exit( 0 );
+				}
 			}
 		}
 	}
@@ -292,4 +316,4 @@ function pbci_security_force_ssl() {
 	return true;
 }
 
-add_action('template_redirect', 'force_ssl');
+add_action('template_redirect', 'pbci_security_force_ssl');
