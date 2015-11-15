@@ -273,7 +273,7 @@ function pbci_log_security_message( $message, $danger = false ) {
 		}
 	}
 
-	error_log( $message . "\n" . $security_log );
+	error_log( $message );
 
 	file_put_contents( $security_log, $message . "\n", FILE_APPEND );
 }
