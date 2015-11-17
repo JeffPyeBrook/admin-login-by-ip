@@ -49,7 +49,7 @@ function restrict_admin_login_by_ip( $user, $password  ) {
 				'65.255.53.164',
 			);
 
-			if ( in_array( $ip, $allowed_ips ) ) {
+			if ( in_array( $ip_info['ip'], $allowed_ips ) ) {
 				error_log( 'Validated administrator user ' . $user->user_login . ' login from ' . $hostname . '(' . $ip . ')' );
 			} else {
 				$user     = new WP_Error( 'Invalid Login', __( 'Login attempt for user "' . $user->user_login . '" from ' . $hostname . '(' . $ip . ')' . ' refused by ' . get_site_url() ) );
@@ -73,28 +73,23 @@ function pbci_early_check_for_access() {
 			if ( ! is_current_ip_allowed() ) {
 				$current_ip = $_SERVER['REMOTE_ADDR'];
 				$transient_key = 'forbidden-ip-' . trim( $current_ip );
-				$failed_access_ettempts = get_transient( $transient_key );
-				if ( false === $failed_access_ettempts ) {
-					$failed_access_ettempts = 0;
+				$failed_access_attempt_count = get_transient( $transient_key );
+				if ( false === $failed_access_attempt_count ) {
+					$failed_access_attempt_count = 0;
 				}
 
-				$failed_access_ettempts = intval( $failed_access_ettempts );
-				$failed_access_ettempts++;
-				set_transient( $transient_key, $failed_access_ettempts, DAY_IN_SECONDS );
+				$failed_access_attempt_count = intval( $failed_access_attempt_count );
+				$failed_access_attempt_count++;
+				set_transient( $transient_key, $failed_access_attempt_count, DAY_IN_SECONDS );
 
-				error_log( 'WARNING: ' . $current_ip . ' has ' . $failed_access_ettempts . ' disallowed access attempts within the last day ' . __FUNCTION__ );
+				error_log( 'WARNING: ' . $current_ip . ' has ' . $failed_access_attempt_count . ' disallowed access attempts within the last day ' . __FUNCTION__ );
 
-				if ( $failed_access_ettempts == 1 ) {
+				if ( ! pbci_is_current_request_hacking() && $failed_access_attempt_count == 1 ) {
+					// we will allow a single failed access attempt before becoming agitated
 					status_header( 403 );
-//					header( 'HTTP/1.0 403 Forbidden' );
-//					echo 'HTTP/1.0 403 Forbidden';
 					exit( 0 );
 				} else {
-					// die as solently as possible
-					if ( ob_get_level() ) {
-						ob_clean();
-					}
-
+					// die as silently as possible, a 404 may let bad buys link we don't have the feature they are requesting
 					status_header( 404 );
 					exit( 0 );
 				}
@@ -102,6 +97,29 @@ function pbci_early_check_for_access() {
 		}
 	}
 }
+
+function pbci_is_current_request_hacking() {
+	$is_request_a_hack = apply_filters( 'pbci_is_current_request_a_hack_attempt', false );
+	return $is_request_a_hack;
+}
+
+add_filter( 'pbci_is_current_request_a_hack_attempt', 'pbci_check_for_multi_get_blogs_request', 10, 1 );
+
+function pbci_check_for_multi_get_blogs_request( $check_value ) {
+
+	if ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) {
+		global $HTTP_RAW_POST_DATA;
+
+		$c = substr_count( $HTTP_RAW_POST_DATA, 'wp.getUsersBlogs' );
+		if ( $c > 1 ) {
+			$check_value = true;
+			error_log( 'HACK ATTEMPT: wp.getUsersBlogs multi call' );
+		}
+	}
+
+	return $check_value;
+}
+
 
 function is_current_script_restricted() {
 
@@ -277,6 +295,8 @@ function add_allowed_ip( $ip = '' ) {
 function pbci_log_security_message( $message, $danger = false ) {
 	$security_log = dirname( dirname( WP_CONTENT_DIR ) ). '/sparkle-security.log';
 
+	error_log( $message );
+
 	$ip = $_SERVER['REMOTE_ADDR'];
 	$ip_info = apply_filters( 'pbci_get_ip_info', false, $ip );
 	if ( ! empty( $ip_info ) ) {
@@ -306,14 +326,13 @@ function pbci_log_security_message( $message, $danger = false ) {
 
 
 function pbci_security_force_ssl() {
-	if ( ! is_ssl () ) {
-		header('HTTP/1.1 301 Moved Permanently');
-		header("Location: https://" . $_SERVER["SERVER_NAME"] . $_SERVER["REQUEST_URI"]);
-		exit();
-		return false;
+	if ( false === strpos( $_SERVER["SERVER_NAME"], '.local' ) ) {
+		if ( ! is_ssl() ) {
+			header( 'HTTP/1.1 301 Moved Permanently' );
+			header( "Location: https://" . $_SERVER["SERVER_NAME"] . $_SERVER["REQUEST_URI"] );
+			exit();
+		}
 	}
 
 	return true;
 }
-
-add_action('template_redirect', 'pbci_security_force_ssl');
