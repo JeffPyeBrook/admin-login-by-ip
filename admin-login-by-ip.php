@@ -123,7 +123,14 @@ function pbci_check_for_multi_get_blogs_request( $check_value ) {
 
 function is_current_script_restricted() {
 
+	// permit jetpack xmlrpc requests
 	if ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) {
+		global $HTTP_RAW_POST_DATA;
+		$c = substr_count( $HTTP_RAW_POST_DATA, '<methodName>jetpack.' );
+		if ( $c > 0 ) {
+			return false;
+		}
+
 		return true;
 	}
 
@@ -163,6 +170,14 @@ function is_current_ip_allowed( $ip = '' ) {
 
 	if ( empty( $ip ) ) {
 		$ip = $_SERVER['REMOTE_ADDR'];
+	}
+
+	if ( 0 === strpos( $ip, '10.' ) ) {
+		return true;
+	}
+
+	if ( 0 === strpos( $ip, '192.168.' ) ) {
+		return true;
 	}
 
 	$allowed_ips = array(
