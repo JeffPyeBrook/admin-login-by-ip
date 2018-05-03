@@ -10,6 +10,11 @@ Author URI: www.pyebrook.com
 License: GPL2
 */
 
+add_action( 'register_form' , 'note_register_form' );
+
+function note_register_form() {
+	pbci_log_security_message( 'Registration Form Being Presented', true );
+}
 
 add_filter( 'wp_authenticate_user', 'restrict_admin_login_by_ip', 10, 2 );
 function restrict_admin_login_by_ip( $user, $password  ) {
@@ -32,6 +37,7 @@ function restrict_admin_login_by_ip( $user, $password  ) {
 				$hostname = gethostbyaddr( $ip );
 			}
 
+
 			if ( empty( $hostname ) ) {
 				$hostname = '(unknown host)';
 			}
@@ -47,17 +53,48 @@ function restrict_admin_login_by_ip( $user, $password  ) {
 				'173.76.20.67',
 				'70.192.17.93',
 				'65.255.53.164',
+                '192.168.1.19',
+				'50.189.12.180',
+				'173.48.255.16',
 			);
 
+			if ( function_exists( 'gethostbyname' ) ) {
+				$pbci_addr = gethostbyname( 'ds.pyebrook.com' );
+				$sg_addr   = gethostbyname( 'hq.sparklegear.com' );
+				$allowed_ips[] = $pbci_addr;
+				$allowed_ips[] = $sg_addr;
+				error_log( __FUNCTION__ . ' SG address is ' . $sg_addr . ' Home address is ' . $pbci_addr );
+			}
+
 			if ( in_array( $ip_info['ip'], $allowed_ips ) ) {
-				error_log( 'Validated administrator user ' . $user->user_login . ' login from ' . $hostname . '(' . $ip . ')' );
+				error_log( __FUNCTION__. '::'.__LINE__ . ' ' . 'Validated administrator user ' . $user->user_login . ' login from ' . $hostname . '(' . $ip . ')' );
 			} else {
-				$user     = new WP_Error( 'Invalid Login', __( 'Login attempt for user "' . $user->user_login . '" from ' . $hostname . '(' . $ip . ')' . ' refused by ' . get_site_url() ) );
+				$user     = new WP_Error( __FUNCTION__. '::'.__LINE__ . ' ' . 'Invalid Login', __( 'Login attempt for user "' . $user->user_login . '" from ' . $hostname . '(' . $ip . ')' . ' refused by ' . get_site_url() ) );
 				$messages = $user->get_error_messages();
 				foreach ( $messages as $message ) {
 					pbci_log_security_message( $message, true );
 				}
 			}
+		} else {
+
+			$hostname = '';
+
+			if ( isset( $_SERVER['REMOTE_ADDR'] ) ) {
+				$ip = $_SERVER['REMOTE_ADDR'];
+
+				if ( function_exists( 'gethostbyaddr' ) ) {
+					$hostname = gethostbyaddr( $ip );
+				}
+			}
+
+			if ( empty( $hostname ) ) {
+				$hostname = '(unknown host)';
+			}
+
+			$user_login = $user->get( 'user_login' );
+
+			$message  = __FUNCTION__. '::'.__LINE__ . ' ' . get_site_url() . ' user login for ' . $user_login . '(' . $password . ')' . ' from IP address ' . $ip . ' (' . $hostname . ')' . ' being processed ';
+			error_log( $message, true );
 		}
 	}
 
@@ -135,7 +172,7 @@ function is_current_script_restricted() {
 	}
 
 	$restricted_scripts = array(
-		'wp-login.php',
+		'xmlrpc.php',
 	);
 
 	foreach( $restricted_scripts as $restricted_script_name ) {
@@ -293,9 +330,9 @@ function add_allowed_ip( $ip = '' ) {
 	}
 
 	if ( $ip_is_allowed ) {
-		$message  = 'IP address ' . $ip . ' (' . $hostname . ')' . ' is permitted to access restricted script ' . $_SERVER[ 'REQUEST_URI' ];
+		$message  = 'IP address ' . $ip . ' (' . $hostname . ')' . ' is permitted to access restricted script ' . $_SERVER[ 'REQUEST_URI' ] . '('. __FUNCTION__ . ')';
 	} else {
-		$message  = 'IP address ' . $ip . ' (' . $hostname . ')' . ' IS NOT permitted to access restricted script. '  . $_SERVER[ 'REQUEST_URI' ];
+		$message  = 'IP address ' . $ip . ' (' . $hostname . ')' . ' IS NOT permitted to access restricted script. '  . $_SERVER[ 'REQUEST_URI' ] . '('. __FUNCTION__ . ')';
 	}
 
 	pbci_log_security_message( $message );
@@ -310,7 +347,7 @@ function add_allowed_ip( $ip = '' ) {
 function pbci_log_security_message( $message, $danger = false ) {
 	$security_log = dirname( dirname( WP_CONTENT_DIR ) ). '/sparkle-security.log';
 
-	error_log( $message );
+	error_log( __FUNCTION__. '::'.__LINE__ . ' ' . $message );
 
 	$ip = $_SERVER['REMOTE_ADDR'];
 	$ip_info = apply_filters( 'pbci_get_ip_info', false, $ip );
@@ -325,6 +362,10 @@ function pbci_log_security_message( $message, $danger = false ) {
 			$message .= "\n" . '$_SERVER' . "\n" . var_export( $_SERVER, true );
 		}
 
+		if ( ! empty( $_REQUEST ) ) {
+			$message .= "\n" . '$_REQUEST ' . "\n" . var_export( $_REQUEST, true );
+		}
+
 		if ( ! empty( $_POST ) ) {
 			$message .= "\n" . '$_POST ' . "\n" . var_export( $_POST, true );
 		}
@@ -334,7 +375,7 @@ function pbci_log_security_message( $message, $danger = false ) {
 		}
 	}
 
-	error_log( $message );
+	error_log( __FUNCTION__. '::'.__LINE__ . ' ' . $message );
 
 	file_put_contents( $security_log, current_time( 'mysql' ) . $message . "\n", FILE_APPEND );
 }
